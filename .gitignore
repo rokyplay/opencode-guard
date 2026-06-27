@@ -1,0 +1,9 @@
+.env
+.env.*
+node_modules/
+*.log
+*.jsonl
+*.sha256
+*.tar.gz
+TEST_RESULTS.md
+.DS_Store
