@@ -31,6 +31,65 @@ Default target detection reviews requests to `api.openai.com` or model IDs match
 - Zen retries: 3 attempts, 1000 ms delay
 - Timeout: 60000 ms
 
+Fast default for OpenCode Zen:
+
+```bash
+export OPENCODEZEN_API_KEY="your-opencode-zen-key"
+```
+
+OpenCode Zen exposes free limited-time chat models such as `deepseek-v4-flash-free`, `mimo-v2.5-free`, `north-mini-code-free`, `nemotron-3-ultra-free`, and `big-pickle` at `https://opencode.ai/zen/v1/chat/completions`. The default guard settings use `deepseek-v4-flash-free` through that endpoint.
+
+Generic SDK-style review backend:
+
+```bash
+export OPENCODE_GUARD_BACKENDS="custom,zen,openai"
+export OPENCODE_GUARD_REVIEW_API_KEY="your-review-api-key"
+export OPENCODE_GUARD_REVIEW_BASE_URL="https://example.com/v1"
+export OPENCODE_GUARD_REVIEW_FORMAT="openai-chat"
+export OPENCODE_GUARD_REVIEW_MODEL="audit-model"
+```
+
+Supported `OPENCODE_GUARD_REVIEW_FORMAT` values:
+
+| Format | Derived path from `OPENCODE_GUARD_REVIEW_BASE_URL` | Request style | Decision parse |
+| --- | --- | --- | --- |
+| `openai-chat` | `/chat/completions` | OpenAI-compatible `messages` | `choices[0].message.content` JSON |
+| `openai-responses` | `/responses` | OpenAI Responses-style `instructions` + `input` | `output_text` JSON |
+| `anthropic-messages` | `/messages` | Anthropic Messages-style `system` + `messages` | `content[].text` JSON |
+| `openai-moderation` | `/moderations` | OpenAI moderation-style `input` | `results[0].flagged` |
+
+If your provider needs a full URL instead of base URL + derived path, set `OPENCODE_GUARD_REVIEW_ENDPOINT`. It overrides the derived endpoint.
+
+DeepSeek official API example:
+
+```bash
+export OPENCODE_GUARD_BACKENDS="custom,zen,openai"
+export OPENCODE_GUARD_REVIEW_API_KEY="$DEEPSEEK_API_KEY"
+export OPENCODE_GUARD_REVIEW_BASE_URL="https://api.deepseek.com"
+export OPENCODE_GUARD_REVIEW_FORMAT="openai-chat"
+export OPENCODE_GUARD_REVIEW_MODEL="deepseek-v4-flash"
+```
+
+OpenCode Zen through the generic backend:
+
+```bash
+export OPENCODE_GUARD_BACKENDS="custom,openai"
+export OPENCODE_GUARD_REVIEW_API_KEY="$OPENCODEZEN_API_KEY"
+export OPENCODE_GUARD_REVIEW_BASE_URL="https://opencode.ai/zen/v1"
+export OPENCODE_GUARD_REVIEW_FORMAT="openai-chat"
+export OPENCODE_GUARD_REVIEW_MODEL="deepseek-v4-flash-free"
+```
+
+OpenAI moderation fallback:
+
+```bash
+export OPENAI_MODERATION_API_KEY="your-openai-key"
+export OPENCODE_GUARD_BACKENDS="openai"
+export OPENCODE_GUARD_OPENAI_MODERATION_MODEL="omni-moderation-latest"
+```
+
+Messages-compatible gateways are supported through `anthropic-messages`, but this guard still never sends `max_tokens` or similar output-limit fields. Direct APIs that require those fields will reject the request unless the provider supplies defaults.
+
 Overrides:
 
 ```bash

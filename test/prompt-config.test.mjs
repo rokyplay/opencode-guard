@@ -6,6 +6,31 @@ import test from "node:test";
 
 import { closeServer, createModerationServer, listen } from "./helpers.mjs";
 
+test("custom review backend derives endpoint paths from base URL and format", async () => {
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-custom-backend-test-"));
+  const { getGuardConfig } = await import(`../lib/config.mjs?custom-backend-config-${Date.now()}`);
+  const { reviewOutboundRequest } = await import(`../lib/reviewer.mjs?custom-backend-reviewer-${Date.now()}`);
+  const cases = [
+    { format: "openai-chat", mode: "custom-openai-chat", path: "/v1/chat/completions" },
+    { format: "openai-responses", mode: "custom-openai-responses", path: "/v1/responses" },
+    { format: "anthropic-messages", mode: "custom-anthropic-messages", path: "/v1/messages" },
+  ];
+  for (const item of cases) {
+    const state = { mode: item.mode, calls: 0, bodies: [], requests: [] };
+    const moderation = await listen(createModerationServer(state));
+    try {
+      const config = getGuardConfig({ OPENCODE_GUARD_LOG_DIR: logDir, OPENCODE_GUARD_BACKENDS: "custom", OPENCODE_GUARD_REVIEW_API_KEY: "mock-custom", OPENCODE_GUARD_REVIEW_BASE_URL: `${moderation.url}/v1`, OPENCODE_GUARD_REVIEW_FORMAT: item.format, OPENCODE_GUARD_REVIEW_MODEL: "audit-model", OPENCODE_GUARD_CACHE: "0", OPENCODE_GUARD_ENABLED: "1" });
+      const decision = await reviewOutboundRequest("safe custom backend text", config);
+      assert.equal(decision.flagged, false);
+      assert.equal(state.calls, 1);
+      assert.equal(new URL(state.requests[0].url, moderation.url).pathname, item.path);
+      assert.equal(state.bodies[0].model, "audit-model");
+    } finally {
+      await closeServer(moderation.server);
+    }
+  }
+});
+
 test("audit prompt file is read for each Zen review", async () => {
   const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-prompt-file-test-"));
   const promptFile = join(logDir, "prompt.txt");
