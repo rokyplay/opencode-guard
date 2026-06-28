@@ -18,6 +18,11 @@ export function createModerationServer(state) {
       response.end("SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed");
       return;
     }
+    if (state.mode === "unauthorized") {
+      response.writeHead(401, { "Content-Type": "text/plain" });
+      response.end("SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed");
+      return;
+    }
     if (state.mode === "invalid-json") {
       response.writeHead(200, { "Content-Type": "text/plain" });
       response.end("SECRET_PROMPT invalid json token should not be printed");

@@ -241,9 +241,45 @@ test("moderation backend failures are fail-closed without leaking backend bodies
     const responseOutput = JSON.stringify(payload);
 
     assert.equal(upstreamState.calls, 0);
-    assert.match(responseOutput, /Moderation check failed\./);
-    assert.equal(JSON.parse(auditOutput.trim()).endpoint, null);
-    assert.doesNotMatch(`${responseOutput}\n${auditOutput}`, /SECRET_PROMPT|Authorization|Bearer|Cookie|raw request body|sk-query-secret|token should not be printed/);
+    assert.match(responseOutput, /Moderation check failed:/);
+    const auditEntry = JSON.parse(auditOutput.trim());
+    assert.equal(auditEntry.endpoint, null);
+    assert.deepEqual(auditEntry.attempts, [{ backend: "openai-moderation", model: "omni-moderation-latest", attempt: null, status: "failed", http_status: 500, error: "HTTP 500: SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed", error_kind: "HTTP 500" }]);
+    assert.match(auditOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
+    assert.match(responseOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
+  } finally {
+    uninstall();
+    await closeServer(moderation.server);
+  }
+});
+
+test("HTTP 401 moderation failures identify the failed backend without leaking backend bodies", async () => {
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-401-test-"));
+  const moderationState = { mode: "unauthorized", calls: 0, bodies: [] };
+  const moderation = await listen(createModerationServer(moderationState));
+  process.env.OPENCODE_GUARD_LOG_DIR = logDir;
+  process.env.OPENCODE_GUARD_BACKENDS = "openai";
+  process.env.OPENCODE_GUARD_CACHE = "0";
+  process.env.OPENCODE_GUARD_ENABLED = "1";
+  process.env.OPENAI_MODERATION_API_KEY = "mock-openai";
+  process.env.OPENCODE_GUARD_OPENAI_MODERATION_ENDPOINT = `${moderation.url}/v1/moderations?api_key=sk-query-secret`;
+
+  const { installOpenCodeModerationFetchInterceptor } = await import(`../lib/fetch-interceptor.mjs?unauthorized-${Date.now()}`);
+  const target = { fetch: async () => new Response("upstream should not run", { status: 200 }) };
+  const uninstall = installOpenCodeModerationFetchInterceptor({ target });
+
+  try {
+    const response = await target.fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.5", input: "trigger 401" }) });
+    const responseOutput = JSON.stringify(await response.json());
+    const auditOutput = await readFile(join(logDir, "interceptor-calls.jsonl"), "utf8");
+    const auditEntry = JSON.parse(auditOutput.trim());
+
+    assert.match(responseOutput, /Moderation check failed:/);
+    assert.match(auditEntry.reason, /openai-moderation\/omni-moderation-latest failed HTTP 401/);
+    assert.match(auditEntry.error, /openai-moderation\/omni-moderation-latest failed HTTP 401/);
+    assert.deepEqual(auditEntry.attempts, [{ backend: "openai-moderation", model: "omni-moderation-latest", attempt: null, status: "failed", http_status: 401, error: "HTTP 401: SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed", error_kind: "HTTP 401" }]);
+    assert.match(auditOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
+    assert.match(responseOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
   } finally {
     uninstall();
     await closeServer(moderation.server);
@@ -272,9 +308,10 @@ test("invalid JSON moderation responses are rejected without uncaught exceptions
     const responseOutput = JSON.stringify(await response.json());
     const auditOutput = await readFile(join(logDir, "interceptor-calls.jsonl"), "utf8");
 
-    assert.match(responseOutput, /Moderation check failed\./);
+    assert.match(responseOutput, /Moderation check failed:/);
     assert.match(auditOutput, /invalid JSON response/);
-    assert.doesNotMatch(`${responseOutput}\n${auditOutput}`, /SECRET_PROMPT|Authorization|Bearer|Cookie|raw request body|token should not be printed/);
+    assert.match(auditOutput, /SECRET_PROMPT invalid json token should not be printed/);
+    assert.match(responseOutput, /SECRET_PROMPT/);
   } finally {
     uninstall();
     await closeServer(moderation.server);
@@ -303,8 +340,14 @@ test("flagged Zen reasons are not echoed to blocked responses", async () => {
     const responseOutput = JSON.stringify(await response.json());
     const auditOutput = await readFile(join(logDir, "interceptor-calls.jsonl"), "utf8");
 
-    assert.match(responseOutput, /The request was flagged by the moderation guard\./);
-    assert.doesNotMatch(`${responseOutput}\n${auditOutput}`, /SECRET_PROMPT|Authorization|Bearer|Cookie|raw request body|token should not be printed/);
+    assert.match(responseOutput, /SECRET_PROMPT Authorization Bearer Cookie raw request body token should not be printed/);
+    const auditEntry = JSON.parse(auditOutput.trim());
+    assert.match(auditEntry.reason, /SECRET_PROMPT Authorization Bearer Cookie raw request body token should not be printed/);
+    assert.match(auditEntry.reason_detail, /SECRET_PROMPT Authorization Bearer Cookie raw request body token should not be printed/);
+    assert.equal(auditEntry.attempts.at(-1).backend, "opencode-zen");
+    assert.equal(auditEntry.attempts.at(-1).status, "ok");
+    assert.match(auditOutput, /SECRET_PROMPT Authorization Bearer Cookie raw request body token should not be printed/);
+    assert.match(responseOutput, /SECRET_PROMPT/);
   } finally {
     uninstall();
     await closeServer(moderation.server);

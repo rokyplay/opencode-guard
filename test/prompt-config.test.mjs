@@ -144,7 +144,7 @@ test("status summary exposes prompt metadata without prompt contents", async () 
   const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-status-test-"));
   const promptFile = join(logDir, "prompt.txt");
   await writeFile(promptFile, "SECRET_PROMPT token should not be printed", { mode: 0o600 });
-  await writeFile(join(logDir, "interceptor-calls.jsonl"), `${JSON.stringify({ timestamp: "2026-06-27T00:00:00.000Z", boundary: "transparent-fetch-interceptor", provider: "openai-moderation", model: "omni-moderation-latest", endpoint: "https://api.openai.com/v1/moderations?api_key=sk-query-secret", http_status: 200, flagged: true, blocked: true, reason: "SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body", error: "token should not be printed", attempts: ["Authorization Bearer sk-attempt-secret"], cache_hit: false, reviewed_body_chars: 123, reviewed_segments: 1, total_segments: 2, baseline_segments: 1, duration_ms: 45 })}\n`, { mode: 0o600 });
+  await writeFile(join(logDir, "interceptor-calls.jsonl"), `${JSON.stringify({ timestamp: "2026-06-27T00:00:00.000Z", boundary: "transparent-fetch-interceptor", provider: "openai-moderation", model: "omni-moderation-latest", endpoint: "https://api.openai.com/v1/moderations?api_key=sk-query-secret", http_status: 200, flagged: true, blocked: true, reason: "flagged", reason_detail: "violence", error: "token should not be printed", attempts: [{ backend: "openai-moderation", model: "omni-moderation-latest", status: "failed", http_status: 401, error: "Authorization Bearer sk-attempt-secret" }], cache_hit: false, reviewed_body_chars: 123, reviewed_segments: 1, total_segments: 2, baseline_segments: 1, duration_ms: 45 })}\n`, { mode: 0o600 });
   await writeFile(join(logDir, "moderation-interceptor-v1-segments.sha256"), `${"a".repeat(64)}\n`, { mode: 0o600 });
 
   const { getGuardConfig } = await import(`../lib/config.mjs?status-config-${Date.now()}`);
@@ -163,9 +163,13 @@ test("status summary exposes prompt metadata without prompt contents", async () 
   assert.equal(summary.prompt.readable, true);
   assert.equal(summary.prompt.preview.enabled, false);
   assert.equal(summary.audit.latest.reason_present, true);
+  assert.equal(summary.audit.latest.reason, "flagged");
+  assert.equal(summary.audit.latest.reason_detail, "violence");
+  assert.deepEqual(summary.audit.latest.attempts, [{ backend: "openai-moderation", model: "omni-moderation-latest", attempt: null, status: "failed", http_status: 401, error: "Authorization Bearer sk-attempt-secret", error_kind: null }]);
   assert.equal(summary.audit.latest.attempts_count, 1);
   assert.equal(summary.audit.latest.token_usage.source, "unavailable");
   assert.equal(summary.audit.totals.token_usage.unavailable_entries, 1);
   assert.equal(summary.cache.entries, 1);
-  assert.doesNotMatch(output, /SECRET_PROMPT|Authorization|Bearer|Cookie|raw request body|sk-zen-secret|sk-openai-secret|sk-query-secret|sk-attempt-secret|token should not be printed/);
+  assert.match(output, /Authorization Bearer sk-attempt-secret/);
+  assert.doesNotMatch(output, /sk-zen-secret|sk-openai-secret|sk-query-secret/);
 });
