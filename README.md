@@ -171,9 +171,9 @@ Audit log:
 ~/.sisyphus/opencode-guard/interceptor-calls.jsonl
 ```
 
-Logs store safe structured metadata only: start/end timestamps, duration, target endpoint type, target model, body chars/bytes, reviewed chars/bytes, moderation request bytes, prompt file metadata and SHA-256 prefix, provider/model, HTTP status, attempt counts, segment/cache counts, flags, sanitized reasons/errors, cache hash, and exact provider `usage` numbers when the backend returns them.
+Logs store safe structured metadata only: start/end timestamps, duration, target endpoint type, target model, body chars/bytes, reviewed chars/bytes, moderation request bytes, prompt file metadata and SHA-256 prefix, provider/model, HTTP status, attempt counts, segment/cache counts, flags, sanitized reasons/errors, cache hash, exact tokenizer counts for the serialized moderation request/response bodies, and exact provider `usage` numbers when present.
 
-Token accounting never uses estimates. If the provider response omits `usage`, the log records token usage as `unavailable` with a reason instead of deriving tokens from characters.
+Token accounting records exact sent/received token counts with `js-tiktoken`. Configure encodings with `OPENCODE_GUARD_OPENAI_MODERATION_TOKEN_ENCODING`, `OPENCODE_GUARD_ZEN_TOKEN_ENCODING`, and `OPENCODE_GUARD_REVIEW_TOKEN_ENCODING`; defaults are `o200k_base`.
 
 Logs do not store raw request bodies, prompts, Authorization headers, raw backend error bodies, raw attempt strings, cookies, tokens, API keys, or response bodies.
 
@@ -183,7 +183,7 @@ Safe status summary:
 ./status
 ```
 
-The status command prints allowlisted metadata only: config health, audit/cache paths, entry counts, timestamps, durations, chars/bytes, segment/cache counts, exact provider token usage totals when available, provider/model names, flags, and whether API keys are set. It does not print raw prompts, request bodies, Authorization headers, cookies, tokens, API keys, raw reasons, raw errors, raw attempt strings, or token estimates.
+The status command prints allowlisted metadata only: config health, audit/cache paths, entry counts, timestamps, durations, chars/bytes, segment/cache counts, exact sent/received token totals, exact provider token usage totals when present, provider/model names, flags, and whether API keys are set. It does not print raw prompts, request bodies, Authorization headers, cookies, tokens, API keys, raw reasons, raw errors, or raw attempt strings.
 
 Audit logs keep raw timestamps in UTC. Status output also includes display timestamps using the system timezone by default, or `timezone=` in `./state` / `OPENCODE_GUARD_TIMEZONE` when set.
 

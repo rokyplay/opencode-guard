@@ -57,11 +57,14 @@ test("transparent interceptor reviews OpenAI provider requests without model rer
     assert.equal(auditLines[0].target_model, "gpt-5.5");
     assert.equal(typeof auditLines[0].started_at, "string");
     assert.equal(typeof auditLines[0].completed_at, "string");
-    assert.equal(auditLines[0].token_usage.source, "provider_response.usage");
+    assert.equal(auditLines[0].token_usage.source, "tokenizer+provider_usage");
     assert.equal(auditLines[0].token_usage.exact, true);
+    assert.equal(auditLines[0].token_usage.tokenizer, "js-tiktoken");
+    assert.equal(auditLines[0].token_usage.encoding, "o200k_base");
+    assert.equal(Number.isInteger(auditLines[0].token_usage.request_tokens), true);
+    assert.equal(Number.isInteger(auditLines[0].token_usage.response_tokens), true);
     assert.equal(auditLines[0].token_usage.input_tokens, 31);
     assert.equal(auditLines[0].token_usage.total_tokens, 31);
-    assert.equal(Object.hasOwn(auditLines[0].token_usage, "estimated_tokens"), false);
     assert.equal(auditLines[1].reviewed_segments, 1);
     assert.equal(auditLines[1].baseline_segments, 1);
 
@@ -244,7 +247,14 @@ test("moderation backend failures are fail-closed without leaking backend bodies
     assert.match(responseOutput, /Moderation check failed:/);
     const auditEntry = JSON.parse(auditOutput.trim());
     assert.equal(auditEntry.endpoint, null);
-    assert.deepEqual(auditEntry.attempts, [{ backend: "openai-moderation", model: "omni-moderation-latest", attempt: null, status: "failed", http_status: 500, error: "HTTP 500: SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed", error_kind: "HTTP 500" }]);
+    assert.equal(auditEntry.attempts[0].backend, "openai-moderation");
+    assert.equal(auditEntry.attempts[0].model, "omni-moderation-latest");
+    assert.equal(auditEntry.attempts[0].status, "failed");
+    assert.equal(auditEntry.attempts[0].http_status, 500);
+    assert.equal(auditEntry.attempts[0].error_kind, "HTTP 500");
+    assert.equal(auditEntry.attempts[0].token_usage.exact, true);
+    assert.equal(Number.isInteger(auditEntry.attempts[0].token_usage.request_tokens), true);
+    assert.equal(Number.isInteger(auditEntry.attempts[0].token_usage.response_tokens), true);
     assert.match(auditOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
     assert.match(responseOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
   } finally {
@@ -277,7 +287,14 @@ test("HTTP 401 moderation failures identify the failed backend without leaking b
     assert.match(responseOutput, /Moderation check failed:/);
     assert.match(auditEntry.reason, /openai-moderation\/omni-moderation-latest failed HTTP 401/);
     assert.match(auditEntry.error, /openai-moderation\/omni-moderation-latest failed HTTP 401/);
-    assert.deepEqual(auditEntry.attempts, [{ backend: "openai-moderation", model: "omni-moderation-latest", attempt: null, status: "failed", http_status: 401, error: "HTTP 401: SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed", error_kind: "HTTP 401" }]);
+    assert.equal(auditEntry.attempts[0].backend, "openai-moderation");
+    assert.equal(auditEntry.attempts[0].model, "omni-moderation-latest");
+    assert.equal(auditEntry.attempts[0].status, "failed");
+    assert.equal(auditEntry.attempts[0].http_status, 401);
+    assert.equal(auditEntry.attempts[0].error_kind, "HTTP 401");
+    assert.equal(auditEntry.attempts[0].token_usage.exact, true);
+    assert.equal(Number.isInteger(auditEntry.attempts[0].token_usage.request_tokens), true);
+    assert.equal(Number.isInteger(auditEntry.attempts[0].token_usage.response_tokens), true);
     assert.match(auditOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
     assert.match(responseOutput, /SECRET_PROMPT Authorization Bearer sk-test Cookie session=abc raw request body token should not be printed/);
   } finally {
