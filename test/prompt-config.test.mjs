@@ -6,6 +6,51 @@ import test from "node:test";
 
 import { closeServer, createModerationServer, listen } from "./helpers.mjs";
 
+test("enabled toggle file controls guard when env override is absent", async () => {
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-toggle-test-"));
+  const enabledFile = join(logDir, "enabled");
+  const stateFile = join(logDir, "missing-state");
+  const { getGuardConfig } = await import(`../lib/config.mjs?toggle-config-1782615196022`);
+
+  await writeFile(enabledFile, "0", { mode: 0o600 });
+  assert.equal(getGuardConfig({ OPENCODE_GUARD_ENABLED_FILE: enabledFile, OPENCODE_GUARD_STATE_FILE: stateFile }).enabled, false);
+  assert.equal(getGuardConfig({ OPENCODE_GUARD_ENABLED_FILE: enabledFile, OPENCODE_GUARD_STATE_FILE: stateFile, OPENCODE_GUARD_ENABLED: "1" }).enabled, true);
+
+  await writeFile(enabledFile, "1", { mode: 0o600 });
+  assert.equal(getGuardConfig({ OPENCODE_GUARD_ENABLED_FILE: enabledFile, OPENCODE_GUARD_STATE_FILE: stateFile }).enabled, true);
+  assert.equal(getGuardConfig({ OPENCODE_GUARD_ENABLED_FILE: enabledFile, OPENCODE_GUARD_STATE_FILE: stateFile, OPENCODE_GUARD_ENABLED: "0" }).enabled, false);
+});
+
+test("state file controls enabled and backend order", async () => {
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-state-test-"));
+  const stateFile = join(logDir, "state");
+  const { getGuardConfig } = await import(`../lib/config.mjs?state-config-1782616262907`);
+
+  await writeFile(stateFile, "enabled=1\nbackend=2", { mode: 0o600 });
+  let config = getGuardConfig({ OPENCODE_GUARD_STATE_FILE: stateFile, OPENCODE_GUARD_ENABLED_FILE: join(logDir, "missing-enabled") });
+  assert.equal(config.enabled, true);
+  assert.equal(config.backendId, "2");
+  assert.deepEqual(config.reviewOrder, ["openai", "zen", "zen-fallbacks"]);
+
+  await writeFile(stateFile, "enabled=0\nbackends=zen", { mode: 0o600 });
+  config = getGuardConfig({ OPENCODE_GUARD_STATE_FILE: stateFile, OPENCODE_GUARD_ENABLED_FILE: join(logDir, "missing-enabled") });
+  assert.equal(config.enabled, false);
+  assert.deepEqual(config.reviewOrder, ["zen"]);
+
+  config = getGuardConfig({ OPENCODE_GUARD_STATE_FILE: stateFile, OPENCODE_GUARD_BACKENDS: "openai" });
+  assert.deepEqual(config.reviewOrder, ["openai"]);
+});
+
+test("state file can override display timezone", async () => {
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-timezone-test-"));
+  const stateFile = join(logDir, "state");
+  const { getGuardConfig } = await import(`../lib/config.mjs?timezone-config-1782646954225`);
+
+  await writeFile(stateFile, "enabled=1\nbackend=2\ntimezone=Asia/Shanghai", { mode: 0o600 });
+  assert.equal(getGuardConfig({ OPENCODE_GUARD_STATE_FILE: stateFile }).displayTimezone, "Asia/Shanghai");
+  assert.equal(getGuardConfig({ OPENCODE_GUARD_STATE_FILE: stateFile, OPENCODE_GUARD_TIMEZONE: "UTC" }).displayTimezone, "UTC");
+});
+
 test("custom review backend derives endpoint paths from base URL and format", async () => {
   const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-custom-backend-test-"));
   const { getGuardConfig } = await import(`../lib/config.mjs?custom-backend-config-${Date.now()}`);
@@ -104,10 +149,13 @@ test("status summary exposes prompt metadata without prompt contents", async () 
 
   const { getGuardConfig } = await import(`../lib/config.mjs?status-config-${Date.now()}`);
   const { buildStatusSummary } = await import(`../lib/status-summary.mjs?status-summary-${Date.now()}`);
-  const config = getGuardConfig({ OPENCODE_GUARD_LOG_DIR: logDir, OPENCODE_GUARD_AUDIT_PROMPT_FILE: promptFile, OPENCODEZEN_API_KEY: "sk-zen-secret", OPENAI_MODERATION_API_KEY: "sk-openai-secret", OPENCODE_GUARD_OPENAI_MODERATION_ENDPOINT: "https://api.openai.com/v1/moderations?api_key=sk-query-secret", OPENCODE_GUARD_ZEN_CHAT_ENDPOINT: "https://opencode.ai/zen/v1/chat/completions?token=secret" });
+  const config = getGuardConfig({ OPENCODE_GUARD_LOG_DIR: logDir, OPENCODE_GUARD_AUDIT_PROMPT_FILE: promptFile, OPENCODEZEN_API_KEY: "sk-zen-secret", OPENAI_MODERATION_API_KEY: "sk-openai-secret", OPENCODE_GUARD_OPENAI_MODERATION_ENDPOINT: "https://api.openai.com/v1/moderations?api_key=sk-query-secret", OPENCODE_GUARD_ZEN_CHAT_ENDPOINT: "https://opencode.ai/zen/v1/chat/completions?token=secret", OPENCODE_GUARD_TIMEZONE: "Asia/Shanghai" });
   const summary = await buildStatusSummary(config);
   const output = JSON.stringify(summary);
 
+  assert.equal(summary.config.display_timezone, "Asia/Shanghai");
+  assert.equal(summary.audit.latest.timestamp_display, "2026-06-27T08:00:00");
+  assert.equal(summary.audit.totals.first_timestamp_display, "2026-06-27T08:00:00");
   assert.equal(summary.config.zen_api_key_set, true);
   assert.equal(summary.config.openai_moderation_api_key_set, true);
   assert.equal(summary.audit.entries, 1);

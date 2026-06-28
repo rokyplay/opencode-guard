@@ -7,3 +7,5 @@ node_modules/
 *.tar.gz
 TEST_RESULTS.md
 .DS_Store
+enabled
+state

@@ -87,6 +87,46 @@ test("transparent interceptor reviews OpenAI provider requests without model rer
   }
 });
 
+test("blocked streaming Responses API requests use Responses SSE events", async () => {
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-responses-stream-test-"));
+  const moderationState = { mode: "block", calls: 0, bodies: [] };
+  const moderation = await listen(createModerationServer(moderationState));
+  process.env.OPENCODE_GUARD_LOG_DIR = logDir;
+  process.env.OPENCODE_GUARD_BACKENDS = "openai";
+  process.env.OPENCODE_GUARD_CACHE = "0";
+  process.env.OPENCODE_GUARD_ENABLED = "1";
+  process.env.OPENCODE_GUARD_TRANSPARENT_ALL_MODELS = "0";
+  process.env.OPENAI_MODERATION_API_KEY = "mock-openai";
+  process.env.OPENCODE_GUARD_OPENAI_MODERATION_ENDPOINT = `${moderation.url}/v1/moderations`;
+
+  const { installOpenCodeModerationFetchInterceptor } = await import(`../lib/fetch-interceptor.mjs?responses-stream-${Date.now()}`);
+  const upstreamState = { calls: 0 };
+  const target = {
+    fetch: async () => {
+      upstreamState.calls += 1;
+      return new Response("upstream should not run", { status: 200 });
+    },
+  };
+  const uninstall = installOpenCodeModerationFetchInterceptor({ target });
+
+  try {
+    const response = await target.fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "gpt-5.5", stream: true, input: "blocked responses stream" }) });
+    const streamText = await response.text();
+    const events = streamText.split("\n\n").filter((chunk) => chunk.startsWith("data: {")).map((chunk) => JSON.parse(chunk.slice(6)));
+
+    assert.equal(upstreamState.calls, 0);
+    assert.equal(response.headers.get("Content-Type"), "text/event-stream");
+    assert.deepEqual(events.map((event) => event.type), ["response.created", "response.output_item.added", "response.output_text.delta", "response.output_item.done", "response.completed"]);
+    assert.match(events[2].delta, /blocked before it was sent upstream/);
+    assert.equal(events[2].item_id, events[3].item.id);
+    assert.equal(events[3].item.id, events[4].response.output[0].id);
+    assert.doesNotMatch(streamText, /chat.completion.chunk/);
+  } finally {
+    uninstall();
+    await closeServer(moderation.server);
+  }
+});
+
 test("first enable reviews only latest actionable segment when history cache is empty", async () => {
   const logDir = await mkdtemp(join(tmpdir(), "opencode-interceptor-first-enable-"));
   const moderationState = { mode: "allow", calls: 0, bodies: [] };

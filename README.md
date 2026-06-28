@@ -14,6 +14,38 @@ Then restart OpenCode. Local plugins in `~/.config/opencode/plugins/` are automa
 
 Code changes still require restarting OpenCode so the plugin module is reloaded. Runtime guard settings below are read on every intercepted request, so env/config changes are hot after the process environment is updated.
 
+## Hot Controls
+
+The plugin can stay installed and loaded. Runtime state is read from `./state` on every intercepted request, so day-to-day enable/disable and backend switching do not require moving files or restarting OpenCode.
+
+PowerShell helpers:
+
+```powershell
+./enable.ps1
+./disable.ps1
+./backend.ps1 2
+```
+
+State file format:
+
+```text
+enabled=1
+backend=2
+timezone=Asia/Shanghai
+```
+
+Backend IDs:
+
+| ID | Review order |
+| --- | --- |
+| `1` | `zen,openai,zen-fallbacks` |
+| `2` | `openai,zen,zen-fallbacks` |
+| `3` | `openai` |
+| `4` | `zen` |
+| `5` | `custom,openai,zen` |
+
+Environment variables still take priority over `./state`: `OPENCODE_GUARD_ENABLED`, `OPENCODE_GUARD_BACKENDS`, `OPENCODE_GUARD_REVIEW_ORDER`, and `OPENCODE_GUARD_TIMEZONE`.
+
 ## Behavior
 
 - Patches `globalThis.fetch` inside the OpenCode process when the plugin loads.
@@ -153,6 +185,8 @@ Safe status summary:
 
 The status command prints allowlisted metadata only: config health, audit/cache paths, entry counts, timestamps, durations, chars/bytes, segment/cache counts, exact provider token usage totals when available, provider/model names, flags, and whether API keys are set. It does not print raw prompts, request bodies, Authorization headers, cookies, tokens, API keys, raw reasons, raw errors, raw attempt strings, or token estimates.
 
+Audit logs keep raw timestamps in UTC. Status output also includes display timestamps using the system timezone by default, or `timezone=` in `./state` / `OPENCODE_GUARD_TIMEZONE` when set.
+
 Use `--json` for machine-readable output:
 
 ```bash
@@ -164,5 +198,7 @@ Use `--json` for machine-readable output:
 ```bash
 node --test test/fetch-interceptor.test.mjs test/prompt-config.test.mjs
 node --check lib/config.mjs
+node --check lib/fetch-interceptor.mjs
 node --check lib/status-summary.mjs
+node --check lib/status-cli.mjs
 ```
