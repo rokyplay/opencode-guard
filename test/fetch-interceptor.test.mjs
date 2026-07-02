@@ -91,7 +91,7 @@ test("transparent interceptor reviews OpenAI provider requests without model rer
 });
 
 test("blocked streaming Responses API requests use Responses SSE events", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-responses-stream-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-responses-stream-test-"));
   const moderationState = { mode: "block", calls: 0, bodies: [] };
   const moderation = await listen(createModerationServer(moderationState));
   process.env.OPENCODE_GUARD_LOG_DIR = logDir;
@@ -217,7 +217,7 @@ test("runtime config is read for every intercepted request", async () => {
 });
 
 test("moderation backend failures are fail-closed without leaking backend bodies", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-fail-closed-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-fail-closed-test-"));
   const moderationState = { mode: "secret-fail", calls: 0, bodies: [] };
   const moderation = await listen(createModerationServer(moderationState));
   process.env.OPENCODE_GUARD_LOG_DIR = logDir;
@@ -264,7 +264,7 @@ test("moderation backend failures are fail-closed without leaking backend bodies
 });
 
 test("HTTP 401 moderation failures identify the failed backend without leaking backend bodies", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-401-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-401-test-"));
   const moderationState = { mode: "unauthorized", calls: 0, bodies: [] };
   const moderation = await listen(createModerationServer(moderationState));
   process.env.OPENCODE_GUARD_LOG_DIR = logDir;
@@ -304,7 +304,7 @@ test("HTTP 401 moderation failures identify the failed backend without leaking b
 });
 
 test("invalid JSON moderation responses are rejected without uncaught exceptions", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-invalid-json-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-invalid-json-test-"));
   const moderationState = { mode: "invalid-json", calls: 0, bodies: [] };
   const moderation = await listen(createModerationServer(moderationState));
   process.env.OPENCODE_GUARD_LOG_DIR = logDir;
@@ -336,7 +336,7 @@ test("invalid JSON moderation responses are rejected without uncaught exceptions
 });
 
 test("flagged Zen reasons are not echoed to blocked responses", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-zen-reason-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-zen-reason-test-"));
   const moderationState = { mode: "zen-block-secret", calls: 0, bodies: [] };
   const moderation = await listen(createModerationServer(moderationState));
   process.env.OPENCODE_GUARD_LOG_DIR = logDir;

@@ -15,4 +15,4 @@ foreach ($key in ($state.Keys | Sort-Object)) {
   if ($key -ne 'enabled' -and $key -ne 'backend') { $lines += "$key=$($state[$key])" }
 }
 Set-Content -LiteralPath $path -Value ($lines -join "`n") -NoNewline
-"opencode-guard state enabled=$($state['enabled']) backend=$($state['backend'])"
+"opencode-safety-filter state enabled=$($state['enabled']) backend=$($state['backend'])"

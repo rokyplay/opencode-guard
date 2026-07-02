@@ -1,6 +1,10 @@
 {
+  "name": "opencode-safety-filter",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node --test test/fetch-interceptor.test.mjs test/prompt-config.test.mjs"
+  },
   "dependencies": {
     "js-tiktoken": "^1.0.21"
   }

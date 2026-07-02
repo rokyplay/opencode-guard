@@ -1,6 +1,6 @@
-# OpenCode Transparent Moderation Interceptor
+# OpenCode Safety Filter
 
-Global OpenCode plugin that transparently intercepts OpenAI provider HTTP requests before they are sent upstream.
+Global OpenCode plugin that transparently safety-checks outbound OpenAI-style provider requests before they are sent upstream.
 
 It does not require changing the selected model or provider. Keep using `openai/gpt-5.5` or any other OpenAI-provider model normally.
 
@@ -12,7 +12,9 @@ It does not require changing the selected model or provider. Keep using `openai/
 
 Then restart OpenCode. Local plugins in `~/.config/opencode/plugins/` are automatically loaded at startup.
 
-Code changes still require restarting OpenCode so the plugin module is reloaded. Runtime guard settings below are read on every intercepted request, so env/config changes are hot after the process environment is updated.
+Code changes still require restarting OpenCode so the plugin module is reloaded. Runtime filter settings below are read on every intercepted request, so env/config changes are hot after the process environment is updated.
+
+The historical environment variable prefix remains `OPENCODE_GUARD_*` for compatibility with existing installs.
 
 ## Hot Controls
 
@@ -56,9 +58,9 @@ Environment variables still take priority over `./state`: `OPENCODE_GUARD_ENABLE
 
 Default target detection reviews requests to `api.openai.com` or model IDs matching `gpt-*`, `o*`, or `codex*`. Set `OPENCODE_GUARD_TRANSPARENT_ALL_MODELS=1` only if you explicitly want every chat/responses model request reviewed.
 
-## Moderation Backends
+## Review Backends
 
-- Default order: `zen,openai,zen-fallbacks`
+- Default review order: `zen,openai,zen-fallbacks`
 - Zen default model: `deepseek-v4-flash-free`
 - Zen retries: 3 attempts, 1000 ms delay
 - Timeout: 60000 ms
@@ -131,7 +133,7 @@ export OPENCODE_GUARD_RETRY_DELAY_MS=1000
 export OPENCODE_GUARD_REVIEW_TIMEOUT_MS=60000
 ```
 
-Moderation API calls never set `max_tokens`, `maxTokens`, `max_output_tokens`, `maxOutputTokens`, or `max_completion_tokens` as request fields.
+Review API calls never set `max_tokens`, `maxTokens`, `max_output_tokens`, `maxOutputTokens`, or `max_completion_tokens` as request fields.
 
 All runtime configuration is centralized in `lib/config.mjs`. The interceptor, reviewer, cache, audit logger, status command, endpoint suffixes, target host, and target model pattern consume that module instead of owning scattered defaults.
 
@@ -158,7 +160,7 @@ The prompt file is read on every reviewed request. Segment cache keys include th
 Allowed segment verdicts are cached by exact SHA-256 marker line at:
 
 ```text
-~/.sisyphus/opencode-guard/moderation-interceptor-v1-segments.sha256
+~/.sisyphus/opencode-safety-filter/moderation-interceptor-v1-segments.sha256
 ```
 
 The key includes policy version, prompt SHA-256, and each canonical outbound segment. There is no TTL, so cache survives restarts and later sessions.
@@ -168,7 +170,7 @@ The interceptor reviews only the newest uncached actionable segment, such as the
 Audit log:
 
 ```text
-~/.sisyphus/opencode-guard/interceptor-calls.jsonl
+~/.sisyphus/opencode-safety-filter/interceptor-calls.jsonl
 ```
 
 Logs store safe structured metadata only: start/end timestamps, duration, target endpoint type, target model, body chars/bytes, reviewed chars/bytes, moderation request bytes, prompt file metadata and SHA-256 prefix, provider/model, HTTP status, attempt counts, segment/cache counts, flags, sanitized reasons/errors, cache hash, exact tokenizer counts for the serialized moderation request/response bodies, and exact provider `usage` numbers when present.

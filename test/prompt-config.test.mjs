@@ -7,7 +7,7 @@ import test from "node:test";
 import { closeServer, createModerationServer, listen } from "./helpers.mjs";
 
 test("enabled toggle file controls guard when env override is absent", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-toggle-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-toggle-test-"));
   const enabledFile = join(logDir, "enabled");
   const stateFile = join(logDir, "missing-state");
   const { getGuardConfig } = await import(`../lib/config.mjs?toggle-config-1782615196022`);
@@ -22,7 +22,7 @@ test("enabled toggle file controls guard when env override is absent", async () 
 });
 
 test("state file controls enabled and backend order", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-state-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-state-test-"));
   const stateFile = join(logDir, "state");
   const { getGuardConfig } = await import(`../lib/config.mjs?state-config-1782616262907`);
 
@@ -42,7 +42,7 @@ test("state file controls enabled and backend order", async () => {
 });
 
 test("state file can override display timezone", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-timezone-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-timezone-test-"));
   const stateFile = join(logDir, "state");
   const { getGuardConfig } = await import(`../lib/config.mjs?timezone-config-1782646954225`);
 
@@ -52,7 +52,7 @@ test("state file can override display timezone", async () => {
 });
 
 test("custom review backend derives endpoint paths from base URL and format", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-custom-backend-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-custom-backend-test-"));
   const { getGuardConfig } = await import(`../lib/config.mjs?custom-backend-config-${Date.now()}`);
   const { reviewOutboundRequest } = await import(`../lib/reviewer.mjs?custom-backend-reviewer-${Date.now()}`);
   const cases = [
@@ -77,7 +77,7 @@ test("custom review backend derives endpoint paths from base URL and format", as
 });
 
 test("audit prompt file is read for each Zen review", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-prompt-file-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-prompt-file-test-"));
   const promptFile = join(logDir, "prompt.txt");
   const promptText = "CUSTOM_AUDIT_PROMPT: decide with JSON only.";
   await writeFile(promptFile, promptText, { mode: 0o600 });
@@ -109,7 +109,7 @@ test("audit prompt file is read for each Zen review", async () => {
 });
 
 test("audit prompt changes invalidate segment cache", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-prompt-cache-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-prompt-cache-test-"));
   const promptFile = join(logDir, "prompt.txt");
   const moderationState = { mode: "allow", calls: 0, bodies: [] };
   const moderation = await listen(createModerationServer(moderationState));
@@ -141,7 +141,7 @@ test("audit prompt changes invalidate segment cache", async () => {
 });
 
 test("status summary exposes prompt metadata without prompt contents", async () => {
-  const logDir = await mkdtemp(join(tmpdir(), "opencode-guard-status-test-"));
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-status-test-"));
   const promptFile = join(logDir, "prompt.txt");
   await writeFile(promptFile, "SECRET_PROMPT token should not be printed", { mode: 0o600 });
   await writeFile(join(logDir, "interceptor-calls.jsonl"), `${JSON.stringify({ timestamp: "2026-06-27T00:00:00.000Z", boundary: "transparent-fetch-interceptor", provider: "openai-moderation", model: "omni-moderation-latest", endpoint: "https://api.openai.com/v1/moderations?api_key=sk-query-secret", http_status: 200, flagged: true, blocked: true, reason: "flagged", reason_detail: "violence", error: "token should not be printed", attempts: [{ backend: "openai-moderation", model: "omni-moderation-latest", status: "failed", http_status: 401, error: "Authorization Bearer sk-attempt-secret", token_usage: { source: "tokenizer", exact: true, tokenizer: "js-tiktoken", encoding: "o200k_base", request_tokens: 11, response_tokens: 7, input_tokens: 11, output_tokens: 7, prompt_tokens: null, completion_tokens: null, total_tokens: 18, cached_tokens: null, reasoning_tokens: null, provider_usage: null } }], cache_hit: false, reviewed_body_chars: 123, reviewed_segments: 1, total_segments: 2, baseline_segments: 1, duration_ms: 45, token_usage: { source: "tokenizer", exact: true, tokenizer: "js-tiktoken", encoding: "o200k_base", request_tokens: 11, response_tokens: 7, input_tokens: 11, output_tokens: 7, prompt_tokens: null, completion_tokens: null, total_tokens: 18, cached_tokens: null, reasoning_tokens: null, provider_usage: null } })}\n`, { mode: 0o600 });

@@ -2,4 +2,4 @@ import { installOpenCodeModerationFetchInterceptor } from "./lib/fetch-intercept
 
 installOpenCodeModerationFetchInterceptor();
 
-export const ModerationGuard = async () => ({});
+export const SafetyFilter = async () => ({});
