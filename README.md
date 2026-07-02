@@ -19,6 +19,7 @@ The historical environment variable prefix remains `OPENCODE_GUARD_*` for compat
 ## Hot Controls
 
 The plugin can stay installed and loaded. Runtime state is read from `./state` on every intercepted request, so day-to-day enable/disable and backend switching do not require moving files or restarting OpenCode.
+If both `./state` and `./enabled` are missing or unreadable, the filter stays disabled instead of enabling itself.
 
 PowerShell helpers:
 
