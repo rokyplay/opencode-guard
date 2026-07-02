@@ -6,6 +6,17 @@ import test from "node:test";
 
 import { closeServer, createModerationServer, listen } from "./helpers.mjs";
 
+test("missing enabled controls keep guard disabled by default", async () => {
+  const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-missing-controls-test-"));
+  const { getGuardConfig } = await import(`../lib/config.mjs?missing-controls-config-${Date.now()}`);
+
+  const config = getGuardConfig({
+    OPENCODE_GUARD_ENABLED_FILE: join(logDir, "missing-enabled"),
+    OPENCODE_GUARD_STATE_FILE: join(logDir, "missing-state"),
+  });
+  assert.equal(config.enabled, false);
+});
+
 test("enabled toggle file controls guard when env override is absent", async () => {
   const logDir = await mkdtemp(join(tmpdir(), "opencode-safety-filter-toggle-test-"));
   const enabledFile = join(logDir, "enabled");
